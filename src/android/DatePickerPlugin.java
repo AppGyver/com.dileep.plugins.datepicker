@@ -30,31 +30,35 @@ import org.apache.cordova.CordovaPlugin;
  *         Rewrote plugin so it it similar to the iOS datepicker plugin and it
  *         accepts prefilled dates and time
  */
-public class DatePickerPlugin extends CordovaPlugin{
+public class DatePickerPlugin extends CordovaPlugin {
 
     private static final String ACTION_DATE = "date";
     private static final String ACTION_TIME = "time";
     private final String pluginName = "DatePickerPlugin";
 
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.phonegap.api.Plugin#execute(java.lang.String, org.json.JSONArray, java.lang.String)
+     */
     @Override
-    public boolean execute(String action, JSONArray args, CallbackContext callbackContext) {
-        Log.d(pluginName, "DatePicker called with options: " + args);
+    public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
+        Log.d(pluginName, "DatePicker called with method: '" + action + "' and options: " + args);
 
-        return this.show(args, callbackContext);
+        show(args, callbackContext);
+        return true;
     }
 
-    public synchronized boolean show(final JSONArray data, final CallbackContext callbackContext) {
+    public synchronized void show(final JSONArray data, final CallbackContext callbackContext) {
+        final Context currentCtx = cordova.getActivity();
         final Calendar c = Calendar.getInstance();
         final Runnable runnable;
-        final Context currentCtx = cordova.getActivity();
-        final DatePickerPlugin datePickerPlugin = this;
 
         String action = "date";
 
         /*
-           * Parse information from data parameter and where possible, override
-           * above date fields
-           */
+         * Parse information from data parameter and where possible, override above date fields
+         */
         int month = -1, day = -1, year = -1, hour = -1, min = -1;
         try {
             JSONObject obj = data.getJSONObject(0);
@@ -62,16 +66,17 @@ public class DatePickerPlugin extends CordovaPlugin{
 
             String optionDate = obj.getString("date");
 
-            String[] datePart = optionDate.split("/");
-            month = Integer.parseInt(datePart[0]);
-            day = Integer.parseInt(datePart[1]);
-            year = Integer.parseInt(datePart[2]);
-            hour = Integer.parseInt(datePart[3]);
-            min = Integer.parseInt(datePart[4]);
+            if (!optionDate.isEmpty()) {
+                String[] datePart = optionDate.split("/");
+                month = Integer.parseInt(datePart[0]);
+                day = Integer.parseInt(datePart[1]);
+                year = Integer.parseInt(datePart[2]);
+                hour = Integer.parseInt(datePart[3]);
+                min = Integer.parseInt(datePart[4]);
 
-            /* currently not handled in Android */
-            // boolean optionAllowOldDates = obj.getBoolean("allowOldDates");
-
+                /* currently not handled in Android */
+                // boolean optionAllowOldDates = obj.getBoolean("allowOldDates");
+            }
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -85,70 +90,84 @@ public class DatePickerPlugin extends CordovaPlugin{
 
         if (ACTION_TIME.equalsIgnoreCase(action)) {
             runnable = new Runnable() {
+                @Override
                 public void run() {
-                    final TimeSetListener timeSetListener = new TimeSetListener(datePickerPlugin, callbackContext);
-                    final TimePickerDialog timeDialog = new TimePickerDialog(currentCtx, timeSetListener, mHour,
-                            mMinutes, true);
+                    final TimeSetListener timeSetListener = new TimeSetListener(callbackContext);
+                    final TimePickerDialog timeDialog = new TimePickerDialog(currentCtx, timeSetListener, mHour, mMinutes, true);
                     timeDialog.show();
                 }
             };
 
         } else if (ACTION_DATE.equalsIgnoreCase(action)) {
             runnable = new Runnable() {
+                @Override
                 public void run() {
-                    final DateSetListener dateSetListener = new DateSetListener(datePickerPlugin, callbackContext);
-                    final DatePickerDialog dateDialog = new DatePickerDialog(currentCtx, dateSetListener, mYear,
-                            mMonth, mDay);
+                    final DateSetListener dateSetListener = new DateSetListener(callbackContext);
+                    final DatePickerDialog dateDialog = new DatePickerDialog(currentCtx, dateSetListener, mYear, mMonth, mDay);
                     dateDialog.show();
                 }
             };
 
         } else {
             Log.d(pluginName, "Unknown action. Only 'date' or 'time' are valid actions");
-            return false;
+            return;
         }
 
         cordova.getActivity().runOnUiThread(runnable);
-        return true;
     }
 
     private final class DateSetListener implements OnDateSetListener {
-        private final DatePickerPlugin datePickerPlugin;
-        private final CallbackContext callbackContext;
+        private final CallbackContext callBackContext;
 
-        private DateSetListener(DatePickerPlugin datePickerPlugin, CallbackContext callbackContext) {
-            this.datePickerPlugin = datePickerPlugin;
-            this.callbackContext = callbackContext;
+        private DateSetListener(CallbackContext callbackContext) {
+            callBackContext = callbackContext;
         }
 
         /**
          * Return a string containing the date in the format YYYY/MM/DD
          */
+        @Override
         public void onDateSet(final DatePicker view, final int year, final int monthOfYear, final int dayOfMonth) {
-            String returnDate = year + "/" + (monthOfYear + 1) + "/" + dayOfMonth;
-            callbackContext.success(returnDate);
+            Date date = new Date(0);
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(date);
+
+            cal.set(Calendar.MONTH, monthOfYear);
+            cal.set(Calendar.DATE, dayOfMonth);
+            cal.set(Calendar.YEAR, year);
+            cal.set(Calendar.HOUR_OF_DAY, 0);
+            cal.set(Calendar.MINUTE, 0);
+            cal.set(Calendar.SECOND, 0);
+
+            String result = String.valueOf(cal.getTimeInMillis());
+
+            callBackContext.success(result);
         }
     }
 
     private final class TimeSetListener implements OnTimeSetListener {
-        private final DatePickerPlugin datePickerPlugin;
-        private final CallbackContext callbackContext;
+        private final CallbackContext callBackContext;
 
-        private TimeSetListener(DatePickerPlugin datePickerPlugin, CallbackContext callbackContext) {
-            this.datePickerPlugin = datePickerPlugin;
-            this.callbackContext = callbackContext;
+        private TimeSetListener(CallbackContext callbackContext) {
+            callBackContext = callbackContext;
         }
 
         /**
-         * Return the current date with the time modified as it was set in the
-         * time picker.
+         * Return the current date with the time modified as it was set in the time picker.
          */
+        @Override
         public void onTimeSet(final TimePicker view, final int hourOfDay, final int minute) {
-            Date date = new Date();
-            date.setHours(hourOfDay);
-            date.setMinutes(minute);
+            Date date = new Date(0);
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(date);
 
-            callbackContext.success(date.toLocaleString());
+            cal.set(Calendar.HOUR_OF_DAY, hourOfDay);
+            cal.set(Calendar.MINUTE, minute);
+            cal.set(Calendar.SECOND, 0);
+
+            String result = String.valueOf(cal.getTimeInMillis());
+
+            callBackContext.success(result);
         }
     }
 
