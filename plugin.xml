@@ -25,7 +25,7 @@
             <clobbers target="datePicker" />
         </js-module>
 
-        <source-file src="src/DatePickerPlugin.java" target-dir="src/com/dileep/plugins/datepicker" />
+        <source-file src="src/android/DatePickerPlugin.java" target-dir="src/com/dileep/plugins/datepicker" />
 
     </platform>
 
